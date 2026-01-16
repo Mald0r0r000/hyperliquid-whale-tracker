@@ -242,6 +242,12 @@ class WhaleTracker:
             
             # Détecter une nouvelle position (pas de position avant, position maintenant)
             if current and not previous:
+                # Fetch winrate for this whale
+                wr_data = self.get_whale_winrate(address, days=30)
+                winrate = wr_data.get('winrate')
+                pnl_30d = wr_data.get('total_pnl', 0)
+                trades_30d = wr_data.get('closed_trades', 0)
+                
                 new_positions.append({
                     'type': 'NEW_POSITION',
                     'address': address,
@@ -250,11 +256,20 @@ class WhaleTracker:
                     'size_btc': abs(current['size_btc']),
                     'entry_price': current['entry_price'],
                     'leverage': current['leverage'],
-                    'account_value': current['account_value']
+                    'account_value': current['account_value'],
+                    'winrate': winrate,
+                    'pnl_30d': pnl_30d,
+                    'trades_30d': trades_30d
                 })
             
             # Détecter un changement de direction
             elif current and previous and current['direction'] != previous['direction']:
+                # Fetch winrate for this whale
+                wr_data = self.get_whale_winrate(address, days=30)
+                winrate = wr_data.get('winrate')
+                pnl_30d = wr_data.get('total_pnl', 0)
+                trades_30d = wr_data.get('closed_trades', 0)
+                
                 new_positions.append({
                     'type': 'DIRECTION_CHANGE',
                     'address': address,
@@ -263,7 +278,10 @@ class WhaleTracker:
                     'new_direction': current['direction'],
                     'size_btc': abs(current['size_btc']),
                     'entry_price': current['entry_price'],
-                    'leverage': current['leverage']
+                    'leverage': current['leverage'],
+                    'winrate': winrate,
+                    'pnl_30d': pnl_30d,
+                    'trades_30d': trades_30d
                 })
             
             # Détecter une augmentation significative de taille (>50%)
@@ -273,6 +291,12 @@ class WhaleTracker:
                 if prev_size > 0:
                     size_change = (curr_size - prev_size) / prev_size * 100
                     if size_change > 50:
+                        # Fetch winrate for this whale
+                        wr_data = self.get_whale_winrate(address, days=30)
+                        winrate = wr_data.get('winrate')
+                        pnl_30d = wr_data.get('total_pnl', 0)
+                        trades_30d = wr_data.get('closed_trades', 0)
+                        
                         new_positions.append({
                             'type': 'SIZE_INCREASE',
                             'address': address,
@@ -281,7 +305,10 @@ class WhaleTracker:
                             'old_size': prev_size,
                             'new_size': curr_size,
                             'increase_pct': round(size_change, 1),
-                            'leverage': current['leverage']
+                            'leverage': current['leverage'],
+                            'winrate': winrate,
+                            'pnl_30d': pnl_30d,
+                            'trades_30d': trades_30d
                         })
         
         # Save current positions for next run
@@ -309,6 +336,17 @@ class WhaleTracker:
     
     def format_position_alert(self, change: Dict) -> str:
         """Formate un changement de position pour Telegram"""
+        # Format winrate line
+        winrate = change.get('winrate')
+        pnl_30d = change.get('pnl_30d', 0)
+        trades_30d = change.get('trades_30d', 0)
+        
+        if winrate is not None:
+            pnl_emoji = "🟢" if pnl_30d > 0 else "🔴" if pnl_30d < 0 else "⚪"
+            winrate_line = f"\n🏆 Winrate: {winrate:.0f}% ({trades_30d} trades) {pnl_emoji} ${pnl_30d:,.0f}"
+        else:
+            winrate_line = "\n🏆 Winrate: N/A (pas de trades BTC)"
+        
         if change['type'] == 'NEW_POSITION':
             emoji = "🟢" if change['direction'] == 'LONG' else "🔴"
             return (
@@ -319,6 +357,7 @@ class WhaleTracker:
                 f"💰 Entry: ${change['entry_price']:,.0f}\n"
                 f"⚡ Leverage: {change['leverage']:.0f}x\n"
                 f"💼 Account: ${change['account_value']:,.0f}"
+                f"{winrate_line}"
             )
         
         elif change['type'] == 'DIRECTION_CHANGE':
@@ -329,6 +368,7 @@ class WhaleTracker:
                 f"❌ {change['old_direction']} → ✅ {change['new_direction']}\n"
                 f"📊 Size: {change['size_btc']:.2f} BTC\n"
                 f"⚡ Leverage: {change['leverage']:.0f}x"
+                f"{winrate_line}"
             )
         
         elif change['type'] == 'SIZE_INCREASE':
@@ -340,6 +380,7 @@ class WhaleTracker:
                 f"📊 {change['old_size']:.2f} → {change['new_size']:.2f} BTC\n"
                 f"💹 +{change['increase_pct']:.0f}%\n"
                 f"⚡ Leverage: {change['leverage']:.0f}x"
+                f"{winrate_line}"
             )
         
         return str(change)
