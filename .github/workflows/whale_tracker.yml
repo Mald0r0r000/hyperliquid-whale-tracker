@@ -1,0 +1,54 @@
+name: Whale Tracker
+
+on:
+  schedule:
+    # Run every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      
+      - name: Download previous positions
+        continue-on-error: true
+        run: |
+          # Download previous positions from Gist if available
+          if [ -n "${{ secrets.GIST_ID }}" ]; then
+            curl -s "https://gist.githubusercontent.com/${{ github.repository_owner }}/${{ secrets.GIST_ID }}/raw/previous_positions.json" -o previous_positions.json || true
+          fi
+      
+      - name: Run Whale Tracker
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python runner.py
+      
+      - name: Upload positions to Gist
+        if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+        run: |
+          if [ -f "previous_positions.json" ] && [ -n "$GIST_ID" ] && [ -n "$GITHUB_TOKEN" ]; then
+            # Upload to Gist for persistence
+            CONTENT=$(cat previous_positions.json | jq -Rs .)
+            curl -X PATCH \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/gists/$GIST_ID" \
+              -d "{\"files\":{\"previous_positions.json\":{\"content\":$CONTENT}}}" || true
+          fi
