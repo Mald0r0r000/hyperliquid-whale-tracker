@@ -70,7 +70,6 @@ class WhaleTracker:
         "0x7fdafde5cfb5465924316eced2d3715494c517d1",
         # Tier 3 - Additional High Performers
         "0x418aa6bf98a2b2bc93779f810330d88cde488888",
-        "0x7ca165f354e3260e2f8d5a7508cc9dd2fa009235",
         "0x2c76be702ee99922754a6df7158091a5e33f7662",
         "0x3e5dacb70247b57aca1d62b927c398ff05b7e570",
         "0x0284bbd3646b59740a167ef78a306028343f3806",
